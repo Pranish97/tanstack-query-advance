@@ -1,73 +1,79 @@
-import axios from "axios";
-import "./App.css";
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import "./App.css";
+import { useAddPost } from "./hooks/useAddPost";
+import { useUsers } from "./hooks/useUsers";
 import type { User } from "./types";
 
-const fetchUsers = async () => {
-  const response = await axios.get(
-    "https://jsonplaceholder.typicode.com/users"
-  );
-  return response.data;
-};
-
-const fetchUserById = async (id: number) => {
-  const response = await axios.get(
-    `https://jsonplaceholder.typicode.com/users/${id}`
-  );
-  return response.data;
-};
-
 function App() {
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const { data: users, isLoading } = useUsers();
+  const {
+    mutate: addPost,
+    isPending,
+    isSuccess,
+  } = useAddPost();
 
-  const queryClient = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [userId, setUserId] = useState(1);
 
-  const { data: users, isLoading } = useQuery({
-    queryKey: ["users"],
-    queryFn: fetchUsers,
-  });
-
-  const handleMouseEnter = (id: number) => {
-    queryClient.prefetchQuery({
-      queryKey: ["user", id],
-      queryFn: () => fetchUserById(id),
-      staleTime: 60 * 1000,
-    });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addPost({ title, body, userId });
   };
 
-  const { data: selectedUser } = useQuery({
-    queryKey: ["user", selectedUserId],
-    queryFn: () => fetchUserById(selectedUserId!),
-    enabled: !!selectedUserId,
-  });
+  return (
+    <div style={{ padding: "20px" }}>
+      <h1>Create a Post</h1>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter Title"
+          />
+        </div>
 
-  if (isLoading) return <div>Loading....</div>;
+        <div>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} />
+        </div>
 
-  return <div style={{padding: "20px"}}>
-    <h1>Users</h1>
-    <ul>
-        {users.map((user:User) => (
-            <li key={user.id} onMouseEnter={() => handleMouseEnter(user.id)}
-            onClick={() => setSelectedUserId(user.id)}
-            style={{cursor: "pointer", marginBottom: "8px"}}
-            >
+        <div>
+          <select
+            value={userId}
+            onChange={(e) => setUserId(Number(e.target.value))}
+          >
+            {users?.map((user: User) => (
+              <option key={user.id} value={user.id}>
                 {user.name}
-            </li>
+              </option>
+            ))}
+          </select>
+        </div>
 
-            
-        ))}
+        <button type="submit" disabled={isPending}>
+          {isPending ? "Adding..." : isSuccess ? "Added" : "Add Post"}
+        </button>
+        {isSuccess && (
+          <p style={{ color: "green" }}>Post Submitted Successfully!</p>
+        )}
 
-        {selectedUser && (
-                <div style={{marginTop: "20px"}}>
-                <h2>{selectedUser.name}</h2>
-                <p>Email: {selectedUser.email}</p>
-                <p>Phone: {selectedUser.phone}</p>
-                <p>Website: {selectedUser.website}</p>
-                </div>
-            )}
-    </ul>
-  </div>;
+        <hr />
+        <h3>Users</h3>
+        {isLoading ? (
+          <p>Loading...</p>
+        ) : (
+          <ul>
+            {users?.map((user: User) => (
+              <li key={user.id}>
+                {user.name} ({user.email})
+              </li>
+            ))}
+          </ul>
+        )}
+      </form>
+    </div>
+  );
 }
 
 export default App;
